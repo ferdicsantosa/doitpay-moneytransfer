@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: doitpay-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: doitpay_transfer
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d doitpay_transfer"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  nsqd:
+    image: nsqio/nsq:v1.3.0
+    container_name: doitpay-nsqd
+    command: /nsqd
+    ports:
+      - "4150:4150"
+      - "4151:4151"
+
+volumes:
+  postgres_data:

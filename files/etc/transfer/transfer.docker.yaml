@@ -1,0 +1,14 @@
+server:
+  port: "8080"
+
+database:
+  dsn: "postgres://postgres:postgres@postgres:5432/doitpay_transfer?sslmode=disable"
+  max_open_conns: 25
+  max_idle_conns: 10
+
+nsq:
+  nsqd_tcp_addr: "nsqd:4150"
+  topic: "disbursement.process"
+  channel: "disbursement_worker"
+  max_attempts: 3
+  concurrency: 5
