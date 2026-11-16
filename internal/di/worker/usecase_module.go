@@ -11,8 +11,10 @@ type UseCaseModule struct {
 func NewUseCaseModule(app *AppModule, repos *RepoModule) *UseCaseModule {
 	return &UseCaseModule{
 		Transfer: transferuc.NewWorkerUseCase(
+			app.TxManager,
 			repos.Transfer,
 			repos.Merchant,
+			repos.Mutation,
 			repos.Partner,
 			app.Config.NSQ.MaxAttempts,
 		),

@@ -17,7 +17,7 @@ type Container struct {
 func BuildContainer(cfg *config.AppConfig, db *sql.DB, producer *nsq.Producer) *Container {
 	app := NewAppModule(cfg, db, producer)
 	repos := NewRepoModule(app)
-	usecases := NewUseCaseModule(repos)
+	usecases := NewUseCaseModule(app, repos)
 	handlers := NewHandlerModule(usecases)
 
 	return &Container{

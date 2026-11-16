@@ -155,3 +155,4 @@ Alasan:
 - all dummy partner is going to one repo, supposedly to have separates repo
 - not implementing authorization, either to check the jwt, or also implement authorization to partner
 - no full test coverage, no unit test
+- jika publish gagal dan refund gagal, maka akan hanya log untuk ini, kedepannya bisa diimprove dengan sistem sweeper atau transactional outbox pattern

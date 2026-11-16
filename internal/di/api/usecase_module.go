@@ -8,11 +8,13 @@ type UseCaseModule struct {
 	Transfer transferuc.APIUseCase
 }
 
-func NewUseCaseModule(repos *RepoModule) *UseCaseModule {
+func NewUseCaseModule(app *AppModule, repos *RepoModule) *UseCaseModule {
 	return &UseCaseModule{
 		Transfer: transferuc.NewAPIUseCase(
+			app.TxManager,
 			repos.Transfer,
 			repos.Merchant,
+			repos.Mutation,
 			repos.Broker,
 		),
 	}

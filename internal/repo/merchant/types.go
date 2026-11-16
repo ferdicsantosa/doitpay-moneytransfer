@@ -15,7 +15,8 @@ var (
 
 type Repository interface {
 	GetByID(ctx context.Context, merchantID int64) (*entity.Merchant, error)
-	UpdateBalance(ctx context.Context, merchantID int64, delta int64) (balanceBefore int64, balanceAfter int64, err error)
+	GetByIDForUpdate(ctx context.Context, merchantID int64) (*entity.Merchant, error)
+	UpdateBalance(ctx context.Context, merchantID int64, newBalance int64) error
 }
 
 type repoModule struct {
