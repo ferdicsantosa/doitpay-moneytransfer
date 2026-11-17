@@ -36,5 +36,37 @@ services:
       timeout: 3s
       retries: 5
 
+  api:
+    build: .
+    container_name: doitpay-api
+    command: ["/app/api"]
+    environment:
+      APP_ENV: docker
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nsqd:
+        condition: service_started
+    restart: on-failure
+
+  worker:
+    build: .
+    container_name: doitpay-worker
+    command: ["/app/worker"]
+    environment:
+      APP_ENV: docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nsqd:
+        condition: service_started
+    restart: on-failure
+
 volumes:
   postgres_data:

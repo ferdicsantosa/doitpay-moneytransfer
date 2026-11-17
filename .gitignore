@@ -1,0 +1,10 @@
+# Logs
+*.log
+
+# Binaries
+/api
+/worker
+/loadtest
+
+# OS
+.DS_Store

@@ -25,11 +25,14 @@ type DatabaseConfig struct {
 }
 
 type NSQConfig struct {
-	NSQDTCPAddr string `yaml:"nsqd_tcp_addr"`
-	Topic       string `yaml:"topic"`
-	Channel     string `yaml:"channel"`
-	MaxAttempts uint16 `yaml:"max_attempts"`
-	Concurrency int    `yaml:"concurrency"`
+	NSQDTCPAddr            string `yaml:"nsqd_tcp_addr"`
+	Topic                  string `yaml:"topic"`
+	Channel                string `yaml:"channel"`
+	MaxAttempts            uint16 `yaml:"max_attempts"`
+	Concurrency            int    `yaml:"concurrency"`
+	RequeueDelaySeconds    int    `yaml:"requeue_delay_seconds"`
+	MaxRequeueDelaySeconds int    `yaml:"max_requeue_delay_seconds"`
+	MsgTimeoutSeconds      int    `yaml:"msg_timeout_seconds"`
 }
 
 type RedisConfig struct {

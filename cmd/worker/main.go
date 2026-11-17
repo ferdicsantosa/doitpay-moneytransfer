@@ -42,6 +42,15 @@ func main() {
 	nsqCfg := nsq.NewConfig()
 	nsqCfg.MaxAttempts = cfg.NSQ.MaxAttempts
 	nsqCfg.MaxInFlight = cfg.NSQ.Concurrency
+	if cfg.NSQ.RequeueDelaySeconds > 0 {
+		nsqCfg.DefaultRequeueDelay = time.Duration(cfg.NSQ.RequeueDelaySeconds) * time.Second
+	}
+	if cfg.NSQ.MaxRequeueDelaySeconds > 0 {
+		nsqCfg.MaxRequeueDelay = time.Duration(cfg.NSQ.MaxRequeueDelaySeconds) * time.Second
+	}
+	if cfg.NSQ.MsgTimeoutSeconds > 0 {
+		nsqCfg.MsgTimeout = time.Duration(cfg.NSQ.MsgTimeoutSeconds) * time.Second
+	}
 
 	consumer, err := nsq.NewConsumer(cfg.NSQ.Topic, cfg.NSQ.Channel, nsqCfg)
 	if err != nil {

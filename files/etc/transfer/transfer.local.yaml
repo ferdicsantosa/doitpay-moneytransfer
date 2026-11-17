@@ -12,6 +12,9 @@ nsq:
   channel: "disbursement_worker"
   max_attempts: 3
   concurrency: 5
+  requeue_delay_seconds: 2
+  max_requeue_delay_seconds: 10
+  msg_timeout_seconds: 60
 
 redis:
   addr: "localhost:6379"

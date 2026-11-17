@@ -22,7 +22,21 @@ Service ini adalah backend disbursement/money transfer yang menerima permintaan 
 
 ## 3. Architecture & Flows
 
-### A. Diagram
+### A. System Architecture
+```mermaid
+flowchart LR
+    Client["Merchant / Load Tester"] -->|"HTTP POST /transfer"| API["API Service (Go)"]
+    API -->|"ACID Tx & FOR UPDATE"| PG[("PostgreSQL")]
+    API -->|"Idempotency Cache"| RD[("Redis")]
+    API -->|"Publish transfer_id"| NSQ["NSQ (nsqd)"]
+
+    NSQ -->|"Consume topic"| WRK["Worker Service (Go)"]
+    WRK -->|"Distributed Lock & Del Cache"| RD
+    WRK -->|"Update Status & Refund Tx"| PG
+    WRK -->|"Simulate Disburse & Webhook"| PRT["Mock Payment Partner"]
+```
+
+### B. Flow Diagram
 ```mermaid
 flowchart TD
     C["Client / Merchant"] -->|"POST /transfer"| API["API Handler (Go)"]
@@ -49,7 +63,7 @@ flowchart TD
     PRT -->|"Permanent Fail / Max Retry"| REF["DB Tx: Mark FAILED, Refund Saldo, Insert CREDIT + Delete Idem Cache + Notify Dummy"] --> REL3["Release Redis Lock & ACK"]
 ```
 
-### B. Main Flow (Happy Path)
+### C. Main Flow (Happy Path)
 ```
 Merchant/Client
    │
@@ -88,7 +102,7 @@ Merchant/Client
    └─ 5. `defer` Release Redis lock dengan Lua script (cek ownership token)
 ```
 
-### C. Negative & Failure Flows
+### D. Negative & Failure Flows
 1. **Validasi Input Gagal / Saldo Tidak Cukup**
    - Validasi input gagal ditolak di handler (`400 Bad Request`).
    - Saldo tidak cukup ditolak sebelum insert (`422 Unprocessable Entity`). Saldo tidak berubah.
@@ -170,8 +184,9 @@ Merchant/Client
 
 ## 6. Cutting Corners & Future Improvements (Production)
 - **Single Partner Repo**: Dummy partner disburse & webhook/notification disatukan dalam satu repo `partner`, seharusnya dipisah sesuai service masing-masing.
-- **No Auth / Signing**: Belum mengimplementasikan autentikasi merchant (JWT/API key) maupun message signing ke partner.
-- **Test Coverage**: Belum ada unit test coverage penuh.
+- **No Auth / HTTP Hardening**: Belum mengimplementasikan autentikasi merchant (JWT/API key), message signing ke partner, maupun `http.MaxBytesReader` / rate limiting.
+- **Worker Timeout & DLQ**: Worker belum membungkus setiap message dengan `context.WithTimeout` khusus per-job dan belum ada Dead Letter Queue (DLQ) jika message gagal diproses hingga `max_attempts` akibat error infrastruktur.
+- **Test Coverage**: Belum ada unit test coverage penuh (interface-first sudah disiapkan agar mudah di-mock).
 - **Stranded Balance Mitigation**: Jika publish ke NSQ gagal dan kompensasi refund juga gagal, saat ini hanya dicatat sebagai log `CRITICAL`; di production seharusnya menggunakan **Transactional Outbox Pattern** dan **Reconciliation / Sweeper Job**.
 - **Observability & Audit**: Di production perlu menambahkan metrics (Prometheus/OTel), structured logging, serta tabel/analytics log per attempt (`transfer_attempts`) jika dibutuhkan untuk investigasi dispute.
 - **Extreme Throughput Scaling**: Saat ini `SELECT ... FOR UPDATE` pada `merchants` sangat aman untuk ratusan TPS; jika satu merchant menembak ribuan TPS terus-menerus (*hot row contention*), dapat ditingkatkan menggunakan **Balance Sharding** atau **Partitioned Single-Writer Queue**.
