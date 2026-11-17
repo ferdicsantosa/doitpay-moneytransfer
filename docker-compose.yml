@@ -25,5 +25,16 @@ services:
       - "4150:4150"
       - "4151:4151"
 
+  redis:
+    image: redis:7-alpine
+    container_name: doitpay-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   postgres_data:

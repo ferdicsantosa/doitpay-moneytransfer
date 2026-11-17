@@ -2,9 +2,11 @@ package transfer
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ferdicsantosa/doitpay-moneytransfer/internal/entity"
 	"github.com/ferdicsantosa/doitpay-moneytransfer/pkg/helper"
+	"github.com/lib/pq"
 )
 
 func (r *repoModule) Create(ctx context.Context, transfer *entity.Transfer) error {
@@ -17,7 +19,7 @@ func (r *repoModule) Create(ctx context.Context, transfer *entity.Transfer) erro
 	`
 
 	exec := helper.GetExecutor(ctx, r.db)
-	return exec.QueryRowContext(
+	err := exec.QueryRowContext(
 		ctx,
 		query,
 		transfer.ID,
@@ -30,4 +32,12 @@ func (r *repoModule) Create(ctx context.Context, transfer *entity.Transfer) erro
 		transfer.Status,
 		transfer.RetryCount,
 	).Scan(&transfer.CreatedAt, &transfer.UpdatedAt)
+	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			return ErrDuplicateTransfer
+		}
+		return err
+	}
+	return nil
 }

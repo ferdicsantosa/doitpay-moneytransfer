@@ -11,6 +11,7 @@ type AppConfig struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
 	NSQ      NSQConfig      `yaml:"nsq"`
+	Redis    RedisConfig    `yaml:"redis"`
 }
 
 type ServerConfig struct {
@@ -29,6 +30,12 @@ type NSQConfig struct {
 	Channel     string `yaml:"channel"`
 	MaxAttempts uint16 `yaml:"max_attempts"`
 	Concurrency int    `yaml:"concurrency"`
+}
+
+type RedisConfig struct {
+	Addr                  string `yaml:"addr"`
+	LockTTLSeconds        int    `yaml:"lock_ttl_seconds"`
+	IdempotencyTTLSeconds int    `yaml:"idempotency_ttl_seconds"`
 }
 
 // LoadByEnv loads files/etc/<app>/<app>.<env>.yaml using APP_ENV (defaults to "local").

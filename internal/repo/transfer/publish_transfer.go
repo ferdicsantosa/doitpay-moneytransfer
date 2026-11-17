@@ -1,16 +1,15 @@
-package broker
+package transfer
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 
 	"github.com/ferdicsantosa/doitpay-moneytransfer/internal/entity"
 )
 
 func (r *repoModule) PublishTransfer(ctx context.Context, msg entity.TransferMessage) error {
-	payload, err := json.Marshal(msg)
-	if err != nil {
-		return err
+	if r.publisher == nil {
+		return errors.New("nsq publisher is not configured")
 	}
-	return r.producer.Publish(r.topic, payload)
+	return r.publisher.Publish(ctx, r.topic, msg)
 }

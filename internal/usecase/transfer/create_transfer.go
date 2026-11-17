@@ -14,26 +14,21 @@ import (
 )
 
 func (u *useCase) CreateTransfer(ctx context.Context, req entity.CreateTransferRequest) (*entity.CreateTransferResponse, error) {
-	var (
-		created     *entity.Transfer
-		isDuplicate bool
-	)
+	idemCacheKey := fmt.Sprintf("idem:transfer:%d:%s", constant.DefaultMerchantID, req.IdempotencyKey)
+
+	if cachedResp, hit, err := u.checkIdempotencyPreLock(ctx, idemCacheKey, req.IdempotencyKey); err != nil {
+		return nil, err
+	} else if hit {
+		return cachedResp, nil
+	}
+
+	var created *entity.Transfer
 
 	err := u.txManager.WithTx(ctx, func(txCtx context.Context) error {
-		// Lock merchant row first to serialize concurrent deductions and idempotency checks.
+		// Lock merchant row to serialize concurrent balance deductions.
 		merchant, err := u.merchantRepo.GetByIDForUpdate(txCtx, constant.DefaultMerchantID)
 		if err != nil {
 			return err
-		}
-
-		existing, err := u.transferRepo.GetByIdempotencyKey(txCtx, merchant.ID, req.IdempotencyKey)
-		if err != nil && !errors.Is(err, transferrepo.ErrTransferNotFound) {
-			return err
-		}
-		if existing != nil {
-			created = existing
-			isDuplicate = true
-			return nil
 		}
 
 		if merchant.Balance < req.Amount {
@@ -75,18 +70,19 @@ func (u *useCase) CreateTransfer(ctx context.Context, req entity.CreateTransferR
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, transferrepo.ErrDuplicateTransfer) {
+			return u.handleDuplicateRace(ctx, idemCacheKey, req.IdempotencyKey)
+		}
 		return nil, err
 	}
 
-	if isDuplicate {
-		return &entity.CreateTransferResponse{
-			TransferID: created.ID,
-			Status:     created.Status,
-			Amount:     created.Amount,
-		}, nil
+	resp := &entity.CreateTransferResponse{
+		TransferID: created.ID,
+		Status:     created.Status,
+		Amount:     created.Amount,
 	}
 
-	if err := u.brokerRepo.PublishTransfer(ctx, entity.TransferMessage{TransferID: created.ID}); err != nil {
+	if err := u.transferRepo.PublishTransfer(ctx, entity.TransferMessage{TransferID: created.ID}); err != nil {
 		log.Printf("[api] failed to publish transfer_id=%s to nsq: %v; compensating balance", created.ID, err)
 		if compErr := u.refundTransfer(context.Background(), created.ID, "broker_publish_failed"); compErr != nil {
 			log.Printf("[api] CRITICAL: failed to compensate transfer_id=%s: %v", created.ID, compErr)
@@ -94,9 +90,59 @@ func (u *useCase) CreateTransfer(ctx context.Context, req entity.CreateTransferR
 		return nil, fmt.Errorf("%w: %v", ErrBrokerUnavailable, err)
 	}
 
-	return &entity.CreateTransferResponse{
-		TransferID: created.ID,
-		Status:     created.Status,
-		Amount:     created.Amount,
-	}, nil
+	u.cacheIdempotency(ctx, idemCacheKey, resp)
+	return resp, nil
+}
+
+func (u *useCase) handleDuplicateRace(ctx context.Context, idemCacheKey, idempotencyKey string) (*entity.CreateTransferResponse, error) {
+	existing, err := u.transferRepo.GetByIdempotencyKey(ctx, constant.DefaultMerchantID, idempotencyKey)
+	if err != nil {
+		return nil, err
+	}
+	resp := &entity.CreateTransferResponse{
+		TransferID: existing.ID,
+		Status:     existing.Status,
+		Amount:     existing.Amount,
+	}
+	u.cacheIdempotency(ctx, idemCacheKey, resp)
+	return resp, nil
+}
+
+// checkIdempotencyPreLock checks Redis first and falls back to a lock-free DB read
+// so duplicate/spam retries avoid contending on the merchant row FOR UPDATE lock.
+func (u *useCase) checkIdempotencyPreLock(ctx context.Context, idemCacheKey, idempotencyKey string) (*entity.CreateTransferResponse, bool, error) {
+	if u.cache != nil {
+		var cached entity.CreateTransferResponse
+		hit, err := u.cache.GetJSON(ctx, idemCacheKey, &cached)
+		if err != nil {
+			log.Printf("[api] redis idempotency get failed (falling back to db): %v", err)
+		} else if hit {
+			return &cached, true, nil
+		}
+	}
+
+	existing, err := u.transferRepo.GetByIdempotencyKey(ctx, constant.DefaultMerchantID, idempotencyKey)
+	if err != nil {
+		if errors.Is(err, transferrepo.ErrTransferNotFound) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+
+	resp := &entity.CreateTransferResponse{
+		TransferID: existing.ID,
+		Status:     existing.Status,
+		Amount:     existing.Amount,
+	}
+	u.cacheIdempotency(ctx, idemCacheKey, resp)
+	return resp, true, nil
+}
+
+func (u *useCase) cacheIdempotency(ctx context.Context, key string, resp *entity.CreateTransferResponse) {
+	if u.cache == nil {
+		return
+	}
+	if err := u.cache.SetJSON(ctx, key, resp, u.idempotencyTTL); err != nil {
+		log.Printf("[api] redis idempotency set failed (ignored): %v", err)
+	}
 }

@@ -16,7 +16,7 @@ type RepoModule struct {
 
 func NewRepoModule(app *AppModule) *RepoModule {
 	return &RepoModule{
-		Transfer: transferrepo.NewRepo(app.DB),
+		Transfer: transferrepo.NewRepo(app.DB, nil, ""),
 		Merchant: merchantrepo.NewRepo(app.DB),
 		Mutation: mutationrepo.NewRepo(app.DB),
 		Partner:  partner.NewRepo(),

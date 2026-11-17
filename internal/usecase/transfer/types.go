@@ -3,14 +3,15 @@ package transfer
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/ferdicsantosa/doitpay-moneytransfer/internal/entity"
-	"github.com/ferdicsantosa/doitpay-moneytransfer/internal/repo/broker"
 	merchantrepo "github.com/ferdicsantosa/doitpay-moneytransfer/internal/repo/merchant"
 	mutationrepo "github.com/ferdicsantosa/doitpay-moneytransfer/internal/repo/mutation"
 	"github.com/ferdicsantosa/doitpay-moneytransfer/internal/repo/partner"
 	transferrepo "github.com/ferdicsantosa/doitpay-moneytransfer/internal/repo/transfer"
 	"github.com/ferdicsantosa/doitpay-moneytransfer/pkg/helper"
+	pkgredis "github.com/ferdicsantosa/doitpay-moneytransfer/pkg/redis"
 )
 
 var (
@@ -26,11 +27,14 @@ type WorkerUseCase interface {
 }
 
 type useCase struct {
-	txManager    helper.TxManager
-	transferRepo transferrepo.Repository
-	merchantRepo merchantrepo.Repository
-	mutationRepo mutationrepo.Repository
-	brokerRepo   broker.Repository
-	partnerRepo  partner.Repository
-	maxAttempts  uint16
+	txManager      helper.TxManager
+	transferRepo   transferrepo.Repository
+	merchantRepo   merchantrepo.Repository
+	mutationRepo   mutationrepo.Repository
+	partnerRepo    partner.Repository
+	locker         pkgredis.Locker
+	cache          pkgredis.Cache
+	lockTTL        time.Duration
+	idempotencyTTL time.Duration
+	maxAttempts    uint16
 }

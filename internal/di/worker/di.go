@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/ferdicsantosa/doitpay-moneytransfer/internal/config"
+	"github.com/redis/go-redis/v9"
 )
 
 type Container struct {
@@ -13,8 +14,8 @@ type Container struct {
 	Handlers *HandlerModule
 }
 
-func BuildContainer(cfg *config.AppConfig, db *sql.DB) *Container {
-	app := NewAppModule(cfg, db)
+func BuildContainer(cfg *config.AppConfig, db *sql.DB, rdb *redis.Client) *Container {
+	app := NewAppModule(cfg, db, rdb)
 	repos := NewRepoModule(app)
 	usecases := NewUseCaseModule(app, repos)
 	handlers := NewHandlerModule(usecases)

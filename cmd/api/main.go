@@ -14,6 +14,7 @@ import (
 	"github.com/ferdicsantosa/doitpay-moneytransfer/internal/di/api"
 	"github.com/ferdicsantosa/doitpay-moneytransfer/pkg/postgres"
 	"github.com/nsqio/go-nsq"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -34,7 +35,17 @@ func main() {
 	}
 	defer producer.Stop()
 
-	container := api.BuildContainer(cfg, db, producer)
+	rdb := redis.NewClient(&redis.Options{
+		Addr: cfg.Redis.Addr,
+	})
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	if err := rdb.Ping(pingCtx).Err(); err != nil {
+		log.Printf("[api] warning: redis unavailable (%v), idempotency will fall back to postgres", err)
+	}
+	pingCancel()
+	defer rdb.Close()
+
+	container := api.BuildContainer(cfg, db, producer, rdb)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", container.Handlers.HTTP.Health)

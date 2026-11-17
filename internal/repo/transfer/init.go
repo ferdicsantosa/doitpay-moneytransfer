@@ -1,9 +1,15 @@
 package transfer
 
-import "database/sql"
+import (
+	"database/sql"
 
-func NewRepo(db *sql.DB) Repository {
+	pkgnsq "github.com/ferdicsantosa/doitpay-moneytransfer/pkg/nsq"
+)
+
+func NewRepo(db *sql.DB, publisher pkgnsq.Publisher, topic string) Repository {
 	return &repoModule{
-		db: db,
+		db:        db,
+		publisher: publisher,
+		topic:     topic,
 	}
 }

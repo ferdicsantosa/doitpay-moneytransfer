@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/ferdicsantosa/doitpay-moneytransfer/internal/config"
 	"github.com/ferdicsantosa/doitpay-moneytransfer/internal/di/worker"
 	"github.com/ferdicsantosa/doitpay-moneytransfer/pkg/postgres"
 	"github.com/nsqio/go-nsq"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -24,7 +27,17 @@ func main() {
 	}
 	defer db.Close()
 
-	container := worker.BuildContainer(cfg, db)
+	rdb := redis.NewClient(&redis.Options{
+		Addr: cfg.Redis.Addr,
+	})
+	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := rdb.Ping(pingCtx).Err(); err != nil {
+		log.Fatalf("failed to connect to redis: %v", err)
+	}
+	defer rdb.Close()
+
+	container := worker.BuildContainer(cfg, db, rdb)
 
 	nsqCfg := nsq.NewConfig()
 	nsqCfg.MaxAttempts = cfg.NSQ.MaxAttempts

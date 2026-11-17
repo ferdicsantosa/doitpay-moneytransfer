@@ -8,11 +8,9 @@ const (
 type TransferStatus string
 
 const (
-	StatusPending    TransferStatus = "PENDING"
-	StatusProcessing TransferStatus = "PROCESSING"
-	StatusRetrying   TransferStatus = "RETRYING"
-	StatusSuccess    TransferStatus = "SUCCESS"
-	StatusFailed     TransferStatus = "FAILED"
+	StatusPending TransferStatus = "PENDING"
+	StatusSuccess TransferStatus = "SUCCESS"
+	StatusFailed  TransferStatus = "FAILED"
 )
 
 func (s TransferStatus) IsTerminal() bool {
