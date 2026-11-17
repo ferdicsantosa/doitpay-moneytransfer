@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/ferdicsantosa/doitpay-moneytransfer/internal/entity"
+	"github.com/ferdicsantosa/doitpay-moneytransfer/pkg/helper"
 )
 
 var (
@@ -17,4 +18,6 @@ type Repository interface {
 	NotifyDummy(ctx context.Context, transfer *entity.Transfer)
 }
 
-type repoModule struct{}
+type repoModule struct {
+	cb *helper.CircuitBreaker
+}

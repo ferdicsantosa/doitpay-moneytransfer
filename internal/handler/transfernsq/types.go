@@ -1,7 +1,9 @@
 package transfernsq
 
 import (
-	transferuc "github.com/ferdicsantosa/doitpay-moneytransfer/internal/usecase/transfer"
+	"context"
+	"time"
+
 	"github.com/nsqio/go-nsq"
 )
 
@@ -9,6 +11,12 @@ type Handler interface {
 	nsq.Handler
 }
 
+type TransferUsecase interface {
+	ProcessTransfer(ctx context.Context, transferID string, attempt uint16) (shouldRequeue bool, err error)
+}
+
 type handler struct {
-	usecase transferuc.WorkerUseCase
+	usecase          TransferUsecase
+	baseRequeueDelay time.Duration
+	maxRequeueDelay  time.Duration
 }

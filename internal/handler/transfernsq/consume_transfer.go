@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"math/rand/v2"
+	"time"
 
 	"github.com/ferdicsantosa/doitpay-moneytransfer/internal/entity"
 	"github.com/nsqio/go-nsq"
@@ -18,7 +20,33 @@ func (h *handler) HandleMessage(msg *nsq.Message) error {
 
 	shouldRequeue, err := h.usecase.ProcessTransfer(context.Background(), payload.TransferID, msg.Attempts)
 	if err != nil && shouldRequeue {
-		return err
+		delay := h.backoffWithJitter(msg.Attempts)
+		log.Printf("[nsq] requeuing transfer_id=%s attempt=%d delay=%s", payload.TransferID, msg.Attempts, delay)
+		msg.RequeueWithoutBackoff(delay)
+		return nil
 	}
 	return nil
+}
+
+func (h *handler) backoffWithJitter(attempt uint16) time.Duration {
+	shift := 0
+	if attempt > 1 {
+		shift = int(attempt - 1)
+	}
+	if shift > 10 {
+		shift = 10
+	}
+
+	delay := h.baseRequeueDelay * time.Duration(1<<shift)
+	if delay > h.maxRequeueDelay {
+		delay = h.maxRequeueDelay
+	}
+
+	// Add up to 50% positive jitter to prevent thundering herd retries.
+	jitter := time.Duration(rand.Int64N(int64(delay/2) + 1))
+	res := delay + jitter
+	if res > h.maxRequeueDelay {
+		return h.maxRequeueDelay
+	}
+	return res
 }

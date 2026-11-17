@@ -2,16 +2,30 @@ package partner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand/v2"
 	"time"
 
 	"github.com/ferdicsantosa/doitpay-moneytransfer/internal/entity"
+	"github.com/ferdicsantosa/doitpay-moneytransfer/pkg/helper"
 )
 
-// Disburse simulates calling an external mock payment provider with random delay and outcome.
+// Disburse simulates calling an external mock payment provider protected by a circuit breaker.
 func (r *repoModule) Disburse(ctx context.Context, transfer *entity.Transfer) error {
+	err := r.cb.Execute(func() error {
+		return r.simulatePartnerCall(ctx, transfer)
+	}, func(err error) bool {
+		return errors.Is(err, ErrRetryable)
+	})
+	if errors.Is(err, helper.ErrCircuitOpen) {
+		return fmt.Errorf("%w: %w", ErrRetryable, err)
+	}
+	return err
+}
+
+func (r *repoModule) simulatePartnerCall(ctx context.Context, transfer *entity.Transfer) error {
 	// Simulate network/provider latency between 100ms and 800ms.
 	delay := time.Duration(100+rand.IntN(700)) * time.Millisecond
 

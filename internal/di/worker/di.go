@@ -18,7 +18,7 @@ func BuildContainer(cfg *config.AppConfig, db *sql.DB, rdb *redis.Client) *Conta
 	app := NewAppModule(cfg, db, rdb)
 	repos := NewRepoModule(app)
 	usecases := NewUseCaseModule(app, repos)
-	handlers := NewHandlerModule(usecases)
+	handlers := NewHandlerModule(app, usecases)
 
 	return &Container{
 		App:      app,

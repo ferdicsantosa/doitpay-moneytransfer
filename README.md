@@ -16,6 +16,7 @@ For detailed architecture diagrams, flows, and schema design, see [TechnicalDesi
 - **Worker Service (`cmd/worker`)**: Consumes messages from NSQ concurrently.
   - Acquires a Redis distributed lock (`SET NX EX` + Lua ownership release) per `transfer_id` to prevent concurrent duplicate disbursements across workers.
   - Simulates an external payment partner (`100–800ms` delay, random success / retryable error / non-retryable error).
+  - Protects partner calls with a **Circuit Breaker** (`CLOSED`/`OPEN`/`HALF-OPEN`) and retries transient errors via NSQ **exponential backoff with jitter**.
   - Updates the transfer to `SUCCESS` or retries via NSQ requeue on transient errors.
   - On permanent failure or exhausted retries, atomically marks the transfer `FAILED`, refunds the merchant balance, and records a `CREDIT` entry in `balance_mutations`.
   - Invalidates the Redis idempotency cache on terminal completion so subsequent retries receive the latest status.
@@ -118,6 +119,7 @@ $$\text{merchants.balance} = 100{,}000{,}000 - \text{SUM}(\text{DEBIT}) + \text{
 - **No Authentication / Request Signing**: Merchant auth (JWT/API key) and partner webhook signatures are omitted.
 - **Combined Mock Partner**: Mock disbursement and dummy webhook/notification live in a single `internal/repo/partner` package.
 - **Limited Automated Tests**: Focused on clean architecture, concurrency safety, and end-to-end load testing rather than full unit test coverage.
+- **Single-Node NSQ Broker**: Chose **NSQ** over Kafka for fast local setup, low resource footprint for reviewers, and native per-message delayed requeue (`RequeueWithoutBackoff`) for exponential backoff + jitter.
 - **Best-Effort Publish Compensation**: If NSQ publishing fails after DB commit, the API compensates via `refundTransfer` (logging `CRITICAL` if compensation also fails).
 
 ### Production Improvements
@@ -125,5 +127,5 @@ $$\text{merchants.balance} = 100{,}000{,}000 - \text{SUM}(\text{DEBIT}) + \text{
 - **Dead Letter Queue (DLQ) & Worker Timeout**: Wrap each worker message in `context.WithTimeout` and route messages that exhaust `max_attempts` due to infra errors to a DLQ + alerting.
 - **HTTP Hardening**: Add `http.MaxBytesReader` on request bodies, rate limiting, and merchant authentication/request signing.
 - **Attempt History & Observability**: Add Prometheus/OpenTelemetry metrics, structured JSON logging, and an append-only `transfer_attempts` table (or log pipeline) for partner dispute auditing.
-- **High-Throughput Scaling**: `SELECT ... FOR UPDATE` on `merchants` comfortably handles hundreds of TPS per merchant. For extreme hot-row contention (thousands of RPS on a single merchant), adopt **Balance Sharding** (splitting merchant balance across $N$ shard rows) or a **Partitioned Single-Writer** architecture.
+- **High-Throughput Scaling & Broker Migration**: `SELECT ... FOR UPDATE` on `merchants` comfortably handles hundreds of TPS per merchant. For extreme hot-row contention (thousands of RPS on a single merchant), adopt **Balance Sharding** or a **Partitioned Single-Writer** architecture. For multi-broker replication (`acks=all`), strict per-merchant ordering, and event replayability for financial auditing, migrate from single-node NSQ to **Kafka** (with retry topics + DLQ).
 - **Automated Test Coverage**: Add unit tests (mocking repo/helper interfaces) and integration tests covering race conditions, idempotency, retries, and refunds.

@@ -1,9 +1,19 @@
 package transfernsq
 
-import transferuc "github.com/ferdicsantosa/doitpay-moneytransfer/internal/usecase/transfer"
+import (
+	"time"
+)
 
-func NewHandler(uc transferuc.WorkerUseCase) Handler {
+func NewHandler(uc TransferUsecase, baseRequeueDelay, maxRequeueDelay time.Duration) Handler {
+	if baseRequeueDelay <= 0 {
+		baseRequeueDelay = 2 * time.Second
+	}
+	if maxRequeueDelay <= 0 {
+		maxRequeueDelay = 10 * time.Second
+	}
 	return &handler{
-		usecase: uc,
+		usecase:          uc,
+		baseRequeueDelay: baseRequeueDelay,
+		maxRequeueDelay:  maxRequeueDelay,
 	}
 }
