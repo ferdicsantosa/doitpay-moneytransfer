@@ -18,7 +18,10 @@ func (h *handler) HandleMessage(msg *nsq.Message) error {
 		return nil // ACK malformed messages so they don't loop infinitely
 	}
 
-	shouldRequeue, err := h.usecase.ProcessTransfer(context.Background(), payload.TransferID, msg.Attempts)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	shouldRequeue, err := h.usecase.ProcessTransfer(ctx, payload.TransferID, msg.Attempts)
 	if err != nil && shouldRequeue {
 		delay := h.backoffWithJitter(msg.Attempts)
 		log.Printf("[nsq] requeuing transfer_id=%s attempt=%d delay=%s", payload.TransferID, msg.Attempts, delay)
